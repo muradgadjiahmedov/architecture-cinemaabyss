@@ -12,6 +12,23 @@ env:
   IMAGE_NAMESPACE: ${{ github.repository_owner }}
 
 jobs:
+
+    # ─── Собираем monolith и кладём в локальный docker‑daemon ───
+    - name: Build monolith (local)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./src/monolith
+        load: true           # ⬅️ НЕ push, а load
+        tags: monolith:ci
+
+    # ─── Собираем movies и кладём в локальный docker‑daemon ───
+    - name: Build movies (local)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./src/microservices/movies
+        load: true
+        tags: movies:ci
+        
 # ---------- 1. Build & push ----------
   build-and-push:
     runs-on: ubuntu-latest
@@ -81,8 +98,7 @@ jobs:
         ports: [ "9092:9092" ]
 
       monolith:
-        build:
-          context: ./src/monolith
+        image: monolith:ci  
         env:
           DB_CONNECTION_STRING: >-
             postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
@@ -90,8 +106,7 @@ jobs:
         options: --health-cmd "wget -qO- http://localhost:8080/health || exit 1" --health-interval 5s --health-retries 10
 
       movies:
-        build:
-          context: ./src/microservices/movies
+        image: movies:ci 
         env:
           DB_CONNECTION_STRING: >-
             postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
