@@ -112,7 +112,7 @@ jobs:
           --health-cmd="wget -qO- http://localhost:8080/health || exit 1"
           --health-interval=5s --health-retries=10
 
-      movies:
+      movies-service:
         image: ghcr.io/${{ github.repository_owner }}/movies:latest
         env:
           DB_CONNECTION_STRING: postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
@@ -134,7 +134,7 @@ jobs:
         image: ghcr.io/${{ github.repository_owner }}/proxy:latest
         env:
           MONOLITH_URL: http://monolith:8080
-          MOVIES_SERVICE_URL: http://movies:8081
+          MOVIES_SERVICE_URL: http:///movies-service:8081
           EVENTS_SERVICE_URL: http://events:8082
           MOVIES_MIGRATION_PERCENT: "50"
         ports: [ "8000:8000" ]
@@ -171,5 +171,5 @@ jobs:
       run: |
         echo "=== monolith ==="
         docker logs $(docker ps -a --filter "name=monolith" --format "{{.ID}}") || true
-        echo "=== movies ==="
+        echo "=== movies-service ==="
         docker logs $(docker ps -a --filter "name=movies" --format "{{.ID}}") || true
