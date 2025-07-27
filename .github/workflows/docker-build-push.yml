@@ -1,0 +1,131 @@
+name: Docker CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]         # или ваша рабочая ветка
+    paths:
+      - 'src/**'
+      - '.github/workflows/docker-build-push.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+# ---------- 1. Build & push ----------
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: docker/setup-qemu-action@v3
+    - uses: docker/setup-buildx-action@v3
+
+    - name: Login to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # proxy
+    - name: Build & push proxy
+      uses: docker/build-push-action@v5
+      with:
+        context: ./src/microservices/proxy
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/proxy:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/proxy:latest
+
+    # events
+    - name: Build & push events
+      uses: docker/build-push-action@v5
+      with:
+        context: ./src/microservices/events
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/events:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/events:latest
+
+# ---------- 2. API tests ----------
+  api-tests:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres_password
+        ports: [ "5432:5432" ]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+
+      zookeeper:
+        image: wurstmeister/zookeeper:latest
+        ports: [ "2181:2181" ]
+
+      kafka:
+        image: wurstmeister/kafka:2.13-2.7.0
+        env:
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+          KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+        ports: [ "9092:9092" ]
+
+      monolith:
+        build:
+          context: ./src/monolith
+        env:
+          DB_CONNECTION_STRING: >-
+            postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
+        ports: [ "8080:8080" ]
+        options: --health-cmd "wget -qO- http://localhost:8080/health || exit 1" --health-interval 5s --health-retries 10
+
+      movies:
+        build:
+          context: ./src/microservices/movies
+        env:
+          DB_CONNECTION_STRING: >-
+            postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
+        ports: [ "8081:8081" ]
+        options: --health-cmd "wget -qO- http://localhost:8081/api/movies/health || exit 1" --health-interval 5s --health-retries 10
+
+      events:
+        image: ghcr.io/${{ env.IMAGE_NAMESPACE }}/events:latest
+        env:
+          KAFKA_BROKERS: kafka:9092
+        ports: [ "8082:8082" ]
+        options: --health-cmd "wget -qO- http://localhost:8082/api/events/health || exit 1" --health-interval 5s --health-retries 10
+
+      proxy:
+        image: ghcr.io/${{ env.IMAGE_NAMESPACE }}/proxy:latest
+        env:
+          MONOLITH_URL: http://monolith:8080
+          MOVIES_SERVICE_URL: http://movies:8081
+          EVENTS_SERVICE_URL: http://events:8082
+          MOVIES_MIGRATION_PERCENT: "50"
+        ports: [ "8000:8000" ]
+        options: --health-cmd "wget -qO- http://localhost:8000/health || exit 1" --health-interval 5s --health-retries 10
+
+    steps:
+    - uses: actions/checkout@v4
+      with: { path: repo }
+
+    - uses: actions/setup-node@v4
+      with: { node-version: 18 }
+
+    - run: npm install -g newman newman-reporter-htmlextra
+
+    - name: Run Postman tests
+      working-directory: repo/tests/postman
+      run: |
+        chmod +x run-tests.sh
+        ./run-tests.sh -e local
