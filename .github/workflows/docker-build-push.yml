@@ -154,6 +154,12 @@ jobs:
     - name: Install Newman
       run: npm install -g newman newman-reporter-htmlextra
 
+      - name: Init DB schema in postgres
+        run: |
+          PG_ID=$(docker ps --filter "name=postgres" --format "{{.ID}}")
+          docker cp src/database/init.sql $PG_ID:/tmp/init.sql
+          docker exec $PG_ID psql -U postgres -d cinemaabyss -f /tmp/init.sql
+
     - name: Run Postman tests
       working-directory: tests/postman
       run: |

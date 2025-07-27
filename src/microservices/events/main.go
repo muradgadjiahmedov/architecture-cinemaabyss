@@ -55,6 +55,10 @@ func handler(eventType string) http.HandlerFunc {
 			http.Error(w, "kafka error", http.StatusBadGateway)
 			return
 		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && err != io.EOF {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(`{"status":"success"}`))
