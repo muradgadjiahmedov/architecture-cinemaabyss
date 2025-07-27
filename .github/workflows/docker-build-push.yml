@@ -85,6 +85,7 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: cinemaabyss
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=5s --health-timeout=5s --health-retries=5
