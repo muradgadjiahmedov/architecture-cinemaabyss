@@ -158,3 +158,11 @@ jobs:
       run: |
         chmod +x run-tests.sh
         ./run-tests.sh -e local
+
+    - name: Show service logs on failure
+      if: failure()            # выполнится, только если контейнеры не взлетели
+      run: |
+        echo "=== monolith ==="
+        docker logs $(docker ps -a --filter "name=monolith" --format "{{.ID}}") || true
+        echo "=== movies ==="
+        docker logs $(docker ps -a --filter "name=movies" --format "{{.ID}}") || true
