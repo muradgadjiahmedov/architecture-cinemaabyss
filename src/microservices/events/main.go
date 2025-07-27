@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"  
 	"log"
 	"net/http"
 	"os"
 	"time"
-
 	"github.com/segmentio/kafka-go"
 )
 
