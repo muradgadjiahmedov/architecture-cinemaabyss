@@ -13,6 +13,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAMESPACE: ${{ github.repository_owner }}
 
+# ─────────────────────────────────────────────────────────────
 jobs:
 # 1️⃣  Build & push образы в GHCR
   build-and-push:
@@ -35,17 +36,15 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # ── monolith (src/monolith) ──────────────────────────────
     - name: Build & push monolith
       uses: docker/build-push-action@v5
       with:
-        context: ./src/monolith          # ← правильный путь
+        context: ./src/monolith
         push: true
         tags: |
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/monolith:${{ github.sha }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/monolith:latest
 
-    # ── movies ───────────────────────────────────────────────
     - name: Build & push movies
       uses: docker/build-push-action@v5
       with:
@@ -55,7 +54,6 @@ jobs:
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/movies:${{ github.sha }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/movies:latest
 
-    # ── proxy ────────────────────────────────────────────────
     - name: Build & push proxy
       uses: docker/build-push-action@v5
       with:
@@ -65,7 +63,6 @@ jobs:
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/proxy:${{ github.sha }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/proxy:latest
 
-    # ── events ───────────────────────────────────────────────
     - name: Build & push events
       uses: docker/build-push-action@v5
       with:
@@ -88,10 +85,9 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_PASSWORD: postgres_password
- #       ports: [ "5432:5432" ]
-        options: >
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 5
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s --health-timeout=5s --health-retries=5
 
       zookeeper:
         image: wurstmeister/zookeeper:latest
@@ -111,27 +107,27 @@ jobs:
         env:
           DB_CONNECTION_STRING: postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
         ports: [ "8080:8080" ]
-        options: >
-          --health-cmd "wget -qO- http://localhost:8080/health || exit 1"
-          --health-interval 5s --health-retries 10
+        options: >-
+          --health-cmd="wget -qO- http://localhost:8080/health || exit 1"
+          --health-interval=5s --health-retries=10
 
       movies:
         image: ghcr.io/${{ github.repository_owner }}/movies:latest
         env:
           DB_CONNECTION_STRING: postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
         ports: [ "8081:8081" ]
-        options: >
-          --health-cmd "wget -qO- http://localhost:8081/api/movies/health || exit 1"
-          --health-interval 5s --health-retries 10
+        options: >-
+          --health-cmd="wget -qO- http://localhost:8081/api/movies/health || exit 1"
+          --health-interval=5s --health-retries=10
 
       events:
         image: ghcr.io/${{ github.repository_owner }}/events:latest
         env:
           KAFKA_BROKERS: kafka:9092
         ports: [ "8082:8082" ]
-        options: >
-          --health-cmd "wget -qO- http://localhost:8082/api/events/health || exit 1"
-          --health-interval 5s --health-retries 10
+        options: >-
+          --health-cmd="wget -qO- http://localhost:8082/api/events/health || exit 1"
+          --health-interval=5s --health-retries=10
 
       proxy:
         image: ghcr.io/${{ github.repository_owner }}/proxy:latest
@@ -141,24 +137,24 @@ jobs:
           EVENTS_SERVICE_URL: http://events:8082
           MOVIES_MIGRATION_PERCENT: "50"
         ports: [ "8000:8000" ]
-        options: >
-          --health-cmd "wget -qO- http://localhost:8000/health || exit 1"
-          --health-interval 5s --health-retries 10
+        options: >-
+          --health-cmd="wget -qO- http://localhost:8000/health || exit 1"
+          --health-interval=5s --health-retries=10
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
 
-      - name: Install Newman
-        run: npm install -g newman newman-reporter-htmlextra
+    - name: Install Newman
+      run: npm install -g newman newman-reporter-htmlextra
 
-      - name: Run Postman tests
-        working-directory: tests/postman
-        run: |
-          chmod +x run-tests.sh
-          ./run-tests.sh -e local
+    - name: Run Postman tests
+      working-directory: tests/postman
+      run: |
+        chmod +x run-tests.sh
+        ./run-tests.sh -e local
