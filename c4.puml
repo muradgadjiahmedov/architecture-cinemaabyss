@@ -1,0 +1,44 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(user, "Пользователь", "Использует сервис с разных устройств: смартфон, ТВ, ПК")
+
+System_Boundary(c1, "Онлайн-кинотеатр «Кинобездна»") {
+
+  Container(gateway, "API Gateway (Proxy Service)", "Go", "Единая точка входа. Делегирует вызовы микросервисам")
+  
+  Container(authService, "Auth Service", "Go", "Аутентификация, авторизация, JWT")
+  Container(userService, "User Service", "Go", "Профили пользователей, избранное, история")
+  Container(movieService, "Movie Metadata Service", "Go", "Метаданные фильмов: жанры, актёры, рейтинги")
+  Container(playerService, "Player Service", "Go", "Запуск и контроль воспроизведения контента")
+  Container(subscriptionService, "Subscription & Billing Service", "Go", "Подписки, тарифы, скидки, статусы")
+  Container(paymentService, "Payment Service", "Go", "Интеграция с платёжными системами")
+  Container(recommendationConsumer, "Recommendation Consumer", "Go + Kafka", "Обработка рекомендаций от внешней системы")
+  Container(adminPanel, "Admin Panel", "React/Vue", "Управление контентом и пользователями")
+  
+  ContainerDb(postgres, "PostgreSQL", "База данных", "Хранение всех данных (можно позже разбить на БД по доменам)")
+  Container(s3, "S3", "Объектное хранилище", "Хранение видео и обложек")
+  Container(kafka, "Kafka", "Очередь событий", "Асинхронное взаимодействие между сервисами")
+}
+
+System_Ext(externalReco, "Внешняя рекомендательная система", "Рекомендации на основе поведения")
+System_Ext(paymentGateway, "Платёжная система", "Платёжный провайдер")
+
+Rel(user, gateway, "Использует", "HTTPS")
+Rel(gateway, authService, "Вызывает для логина/токена", "HTTP")
+Rel(gateway, userService, "Передаёт запросы о профиле и истории", "HTTP")
+Rel(gateway, movieService, "Получает метаданные", "HTTP")
+Rel(gateway, playerService, "Управление плеером", "HTTP")
+Rel(gateway, subscriptionService, "Запросы подписок", "HTTP")
+Rel(subscriptionService, paymentService, "Обработка платежей", "HTTP")
+Rel(paymentService, paymentGateway, "Интеграция", "API")
+Rel(movieService, postgres, "Чтение/запись")
+Rel(userService, postgres, "Чтение/запись")
+Rel(authService, postgres, "Чтение/запись")
+Rel(subscriptionService, postgres, "Чтение/запись")
+Rel(paymentService, postgres, "Чтение/запись")
+Rel(playerService, s3, "Воспроизведение видео")
+Rel(recommendationConsumer, kafka, "Слушает события")
+Rel(externalReco, kafka, "Публикует рекомендации", "Kafka Topic")
+@enduml

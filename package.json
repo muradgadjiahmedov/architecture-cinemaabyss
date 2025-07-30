@@ -1,0 +1,7 @@
+{
+  "name": "cinemaabyss-tests",
+  "version": "1.0.0",
+  "scripts": {
+    "test:kubernetes": "npm install -g newman newman-reporter-htmlextra && ./tests/postman/run-tests.sh -e kubernetes"
+  }
+}
